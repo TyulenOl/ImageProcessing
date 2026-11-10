@@ -16,9 +16,4 @@
       <PackageReference Include="ScottPlot" Version="5.1.59" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Histograms\" />
-      <Folder Include="Images\Processed\" />
-    </ItemGroup>
-
 </Project>

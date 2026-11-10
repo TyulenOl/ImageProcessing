@@ -1,83 +1,71 @@
-﻿using Core.Algorithms.Contrast;
+﻿using Core.Algorithms;
+using Core.Algorithms.Contrast;
 using Core.Algorithms.Histogram;
 using Core.Models;
 using ImageProcessing.Cl;
 
-var imageFolder = "D:\\Tyulenev\\c#\\SIOVI\\ImageProcessing.Cl\\Images";
-var histogramFolder = "D:\\Tyulenev\\c#\\SIOVI\\ImageProcessing.Cl\\Histograms";
+var originDirectory = "D:\\Tyulenev\\c#\\SIOVI\\ImageProcessing.Cl\\Origin";
+var resultsDirectory = "D:\\Tyulenev\\c#\\SIOVI\\ImageProcessing.Cl\\Results";
 
-var imageOriginFolder = Path.Combine(imageFolder, "Origin");
-var imageProcessedFolder = Path.Combine(imageFolder, "Processed");
-var inputPath = Path.Combine(imageOriginFolder, "images.jpg");
+var originImagesDirectory = Path.Combine(originDirectory, "Images");
+var originHistogramsDirectory = Path.Combine(originDirectory, "Histograms");
 
-var tasks = new List<ImageProcessingTask>
+var mediumImagePath = Path.Combine(originImagesDirectory, "medium_grayscale.png");
+var lightImagePath = Path.Combine(originImagesDirectory, "light_grayscale.jpg");
+var darkImagePath = Path.Combine(originImagesDirectory, "dark_grayscale.jpg");
+
+var mediumPaths = new ImageResultPaths(resultsDirectory, "Medium");
+var lightPaths = new ImageResultPaths(resultsDirectory, "Light");
+var darkPaths = new ImageResultPaths(resultsDirectory, "Dark");
+
+Directory.CreateDirectory(resultsDirectory);
+Directory.CreateDirectory(originHistogramsDirectory);
+
+var algorithms = new List<(string Name, IImageProcessingAlgorithm Algorithm)>
 {
-    new(
-        new LinearContrastAlgorithm(0, 150),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "linear.png"),
-        Path.Combine(histogramFolder, "linear.png")
-    ),
-    new(
-        new InvertedContrastAlgorithm(),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "inverted.png"),
-        Path.Combine(histogramFolder, "inverted.png")
-    ),
-    new(
-        new BrightnessSlicingAlgorithm(80, 180),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "slicing.png"),
-        Path.Combine(histogramFolder, "slicing.png")
-    ),
-    new(
-        new UniformHistogramAlgorithm(),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "uniform.png"),
-        Path.Combine(histogramFolder, "uniform.png")
-    ),
-    new(
-        new ExponentialHistogramAlgorithm(alpha:0.02),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "exponential.png"),
-        Path.Combine(histogramFolder, "exponential.png")
-    ),
-    new(
-        new RayleighHistogramAlgorithm(alpha:70),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "rayleigh.png"),
-        Path.Combine(histogramFolder, "rayleigh.png")
-    ),
-    new(
-        new PowerHistogramAlgorithm(),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "power.png"),
-        Path.Combine(histogramFolder, "power.png")
-    ),
-    new(
-        new HyperbolicHistogramAlgorithm(),
-        inputPath,
-        Path.Combine(imageProcessedFolder, "hyperbolic.png"),
-        Path.Combine(histogramFolder, "hyperbolic.png")
-    )
+    ("linear", new LinearContrastAlgorithm(50, 200)),
+    ("inverted", new InvertedContrastAlgorithm()),
+    ("slicing", new BrightnessSlicingAlgorithm(50, 200)),
+    ("uniform", new UniformHistogramAlgorithm()),
+    ("exponential", new ExponentialHistogramAlgorithm(alpha: 0.02)),
+    ("rayleigh", new RayleighHistogramAlgorithm(alpha: 70)),
+    ("power", new PowerHistogramAlgorithm()),
+    ("hyperbolic", new HyperbolicHistogramAlgorithm())
 };
+
+var images = new[]
+{
+    (Path: mediumImagePath, Results: mediumPaths),
+    (Path: lightImagePath, Results: lightPaths),
+    (Path: darkImagePath, Results: darkPaths)
+};
+
+var tasks = images.SelectMany(image =>
+    algorithms.Select(algorithm =>
+        new ImageProcessingTask(
+            algorithm: algorithm.Algorithm,
+            inputPath: image.Path,
+            outputPath: image.Results.GetImagePath(algorithm.Name),
+            histogramOutputPath: image.Results.GetHistogramPath(algorithm.Name)
+        )
+    )
+).ToList();
 
 var imageFileService = new ImageFileService();
 var histogramPlotter = new HistogramPlotter();
 
-var uniqueImagePaths = tasks.Select(x => x.InputPath).ToHashSet();
-foreach (var imagePath in uniqueImagePaths)
+foreach (var image in images)
 {
-    var imageData = imageFileService.LoadGrayscale(imagePath);
+    var imageData = imageFileService.LoadGrayscale(image.Path);
     var histogram = ImageHistogram.FromImageData(imageData);
-    var fileName = Path.GetFileNameWithoutExtension(imagePath) + ".png";
-    histogramPlotter.Save(histogram, Path.Combine(histogramFolder, fileName));
+    var fileName = "histogram_" + Path.GetFileNameWithoutExtension(image.Path) + ".png";
+    histogramPlotter.Save(histogram, Path.Combine(originHistogramsDirectory, fileName));
 }
 
 foreach (var task in tasks)
 {
     var imageData = imageFileService.LoadGrayscale(task.InputPath);
-    
+
     var processedImageData = task.Algorithm.Process(imageData);
     imageFileService.SaveGrayscale(processedImageData, task.OutputPath);
 

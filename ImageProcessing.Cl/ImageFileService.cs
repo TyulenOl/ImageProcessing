@@ -9,21 +9,13 @@ public class ImageFileService
     {
         using var image = new MagickImage(path);
 
-        if (image.DetermineColorType() != ColorType.Grayscale)
-        {
-            throw new ArgumentException("The image must be grayscale.");
-        }
-
-        if (image.Depth != 8)
-        {
-            throw new ArgumentException("The image must be 8-bit.");
-        }
+        image.ColorType = ColorType.Grayscale;
+        image.Depth = 8;
 
         var height = (int)image.Height;
         var width = (int)image.Width;
 
         var pixels = new byte[height * width];
-
         var pixelCollection = image.GetPixels();
 
         for (int y = 0; y < height; y++)
